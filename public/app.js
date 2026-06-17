@@ -61,7 +61,10 @@ async function api(path, options = {}) {
     credentials: "same-origin",
     ...options
   });
-  const data = await response.json();
+  const contentType = response.headers.get("Content-Type") || "";
+  const data = contentType.includes("application/json")
+    ? await response.json()
+    : { error: await response.text() || "Server nevratil platnu odpoved." };
   if (!response.ok) throw new Error(data.error || "Akcia sa nepodarila.");
   return data;
 }
