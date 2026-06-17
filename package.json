@@ -1,0 +1,12 @@
+{
+  "name": "online-objednavaci-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jednoduchy online objednavaci system tovaru",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

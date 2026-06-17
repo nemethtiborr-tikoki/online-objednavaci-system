@@ -1,0 +1,6 @@
+node_modules/
+.env
+
+# Local runtime data
+data/*.log
+data/db.json
