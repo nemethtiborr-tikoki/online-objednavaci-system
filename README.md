@@ -17,7 +17,7 @@ Podla `.env.example` nastavte najma:
 - `ADMIN_USERNAME`, `ADMIN_EMAIL`, `OWNER_EMAIL`, `COMPANY_NAME`
 - `NODE_ENV=production` - zapne bezpecny session cookie cez HTTPS
 
-`ADMIN_PASSWORD` sa pouzije iba pri vytvoreni prvej databazy. Heslo sa uklada ako scrypt hash, nie v citatelnom tvare.
+`ADMIN_PASSWORD` vytvori prveho administratora a pri dalsom starte bezpecne zosynchronizuje jeho heslo. Zmena tejto premennej na Renderi preto sluzi aj na rotaciu hesla. Heslo sa uklada ako scrypt hash, nie v citatelnom tvare.
 
 ## Lokalny start
 

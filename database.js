@@ -160,9 +160,20 @@ async function createSchema(client = pool) {
 async function initializeDatabase() {
   await createSchema();
   const { rows: [{ count }] } = await pool.query("SELECT COUNT(*)::integer AS count FROM users");
-  if (count > 0) return;
-
   const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (count > 0) {
+    if (adminPassword) {
+      if (adminPassword.length < 10) throw new Error("ADMIN_PASSWORD musi mat aspon 10 znakov.");
+      const result = await pool.query(
+        "UPDATE users SET password_hash=$1 WHERE username=$2 AND role='admin'",
+        [await hashPassword(adminPassword), process.env.ADMIN_USERNAME || "admin"]
+      );
+      if (!result.rowCount) throw new Error("Administrator urceny cez ADMIN_USERNAME neexistuje.");
+    }
+    return;
+  }
+
   if (!adminPassword || adminPassword.length < 10) {
     throw new Error("Pre prvy start nastavte ADMIN_PASSWORD s aspon 10 znakmi.");
   }
