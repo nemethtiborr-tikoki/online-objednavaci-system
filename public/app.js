@@ -146,10 +146,9 @@ function renderLogin() {
       <h1>Objednávkový systém CORNiCO</h1>
       <p class="muted">Prihlasenie zakaznika alebo administratora.</p>
     </div>
-    <label>Prihlasovacie meno<input name="username" autocomplete="username" required value="zakaznik"></label>
-    <label>Heslo<input name="password" type="password" autocomplete="current-password" required value="zakaznik123"></label>
+    <label>Prihlasovacie meno<input name="username" autocomplete="username" required></label>
+    <label>Heslo<input name="password" type="password" autocomplete="current-password" required></label>
     <button type="submit">Prihlasit sa</button>
-    <p class="muted">Demo: zakaznik / zakaznik123 alebo admin / admin123</p>
     <p class="message error"></p>
   `;
   form.addEventListener("submit", async event => {
@@ -1060,7 +1059,7 @@ function renderCustomerForm(customer = null, options = {}) {
   const passwordHint = customer ? " placeholder=\"Nechajte prazdne bez zmeny\"" : "";
   const loginFields = options.showLogin ? `
     <label class="span-2">Prihlasovacie meno<input name="username" required value="${escapeHtml(customer?.username || "")}"></label>
-    <label class="span-2">Heslo<input name="password" ${passwordRequired}${passwordHint}></label>
+    <label class="span-2">Heslo<input name="password" type="password" autocomplete="new-password" ${passwordRequired}${passwordHint}></label>
   ` : "";
 
   form.innerHTML = `

@@ -1,107 +1,65 @@
 # Online objednavaci system
 
-Jednoduchy prototyp objednavacieho systemu tovaru pre zakaznikov a administratora.
+Objednavacia aplikacia pre zakaznikov a administratora. Produkcne data uklada do PostgreSQL databazy (odporucany Neon) a aplikacia moze bezat na Renderi.
 
-## Spustenie
+## Poziadavky
 
-Ak mate v systeme nainstalovany Node.js:
+- Node.js 22 alebo novsi
+- PostgreSQL databaza
+- pnpm
+
+## Premenne prostredia
+
+Podla `.env.example` nastavte najma:
+
+- `DATABASE_URL` - PostgreSQL connection string z Neonu
+- `ADMIN_PASSWORD` - pociatocne heslo administratora, minimalne 10 znakov
+- `ADMIN_USERNAME`, `ADMIN_EMAIL`, `OWNER_EMAIL`, `COMPANY_NAME`
+- `NODE_ENV=production` - zapne bezpecny session cookie cez HTTPS
+
+`ADMIN_PASSWORD` sa pouzije iba pri vytvoreni prvej databazy. Heslo sa uklada ako scrypt hash, nie v citatelnom tvare.
+
+## Lokalny start
 
 ```powershell
-npm start
+pnpm install
+$env:DATABASE_URL="postgresql://..."
+$env:ADMIN_PASSWORD="dlhe-jedinecne-heslo"
+pnpm start
 ```
 
-Ak Node.js nie je v systeme nainstalovany, v prostredi Codexu funguje prilozeny runtime:
+Aplikacia bude dostupna na `http://localhost:3000`.
+
+## Prenos existujucej SQLite databazy do Neonu
+
+Migracia cielovu PostgreSQL databazu vymaze a nahradi obsahom `data/app.sqlite`. Pred spustenim preto skontrolujte `DATABASE_URL`.
 
 ```powershell
-& 'C:\Users\referent.CORNICO\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' server.js
+$env:DATABASE_URL="postgresql://...neon.tech/...?..."
+pnpm run migrate:neon -- --confirm
 ```
 
-Potom otvorte:
+Migracia prenesie nastavenia, pouzivatelov, tovary, objednavky a polozky objednavok. Povodne hesla pri prenose automaticky zahashuje.
 
-```text
-http://localhost:3000
+## Render
+
+Repozitar obsahuje `render.yaml`. V nastaveniach Renderu pridajte tajne premenne:
+
+- `DATABASE_URL`
+- `ADMIN_PASSWORD`
+- `ADMIN_EMAIL`
+- `OWNER_EMAIL`
+- `COMPANY_NAME`
+
+Build command je `pnpm install --frozen-lockfile`, start command `pnpm start` a kontrolna adresa `/api/health`.
+
+## Kontroly
+
+```powershell
+pnpm run check
+pnpm test
 ```
-
-## Databaza
-
-System pouziva SQLite databazu v subore:
-
-```text
-data/app.sqlite
-```
-
-Pri prvom spusteni sa existujuce data z povodneho suboru `data/db.json` automaticky prenesu do SQLite. Subor `data/db.json` potom ostava len ako povodna zaloha/migracny zdroj; nove zmeny sa zapisuju do `data/app.sqlite`.
-
-## Demo ucty
-
-- Zakaznik: `zakaznik` / `zakaznik123`
-- Administrator: `admin` / `admin123`
-
-## Co system obsahuje
-
-- prihlasenie zakaznika a administratora
-- objednavkovy formular so zoznamom aktivneho tovaru
-- mnozstva v celych kusoch a poznamka k objednavke
-- vypocet celkovej hmotnosti objednavky
-- historia objednavok pre zakaznika
-- zakaznicky profil s firemnymi udajmi, telefonom, menom objednavajuceho a nazvom prevadzky
-- administracia tovarovych poloziek
-- filter a radenie zoznamu tovarovych poloziek podla stlpcov
-- import tovarovych poloziek z CSV s kontrolou duplicit a moznostou prepisu
-- administracia zakaznikov
-- historia objednavok pre administratora
-- uvodny admin prehlad so sumarom novych objednavok
-- zoznam objednavok v administracii s otvorenim detailu objednavky
-- rozbalitelny filter objednavok podla udajov v objednavke
-- radenie zoznamu objednavok podla stlpcov
-- uprava stavu, poznamky a mnozstiev v objednavke s moznostou zrusit neulozene upravy a zatvorit detail
-- tlac objednavky z administracie
-- zapis simulovanych e-mailov do suboru `data/emails.log`
-
-## Tovarova polozka
-
-Kazda polozka obsahuje:
-
-- cislo karty
-- nazov
-- mernu jednotku
-- hmotnost
-- cenu
-- aktivitu polozky
-
-## Import tovaru z CSV
-
-V administracii v casti `Tovarove polozky` je mozne importovat CSV subor. Podporovane hlavicky:
-
-```csv
-cislo karty;nazov;merna jednotka;hmotnost;cena;aktivna
-1001;Hladka muka special;kg;1;0,89;ano
-```
-
-Duplicitne polozky sa kontroluju podla `cislo karty`. Pri importe si administrator vyberie, ci existujuce polozky preskocit alebo prepisat.
-
-## Zakaznicky profil
-
-Zakaznik si vie upravit:
-
-- firemny nazov
-- ICO
-- DIC
-- IC DPH
-- telefonne cislo
-- meno objednavajuceho
-- nazov prevadzky
-- adresu
-
-Administrator vie v casti `Zakaznici` vytvarat novych zakaznikov, upravovat ich udaje a vymazat zakaznicke ucty.
-
-## Stavy objednavky
-
-Nova objednavka automaticky dostane stav `nova objednavka`. Administrator ju potom vie zmenit na:
-
-- spracovava sa
-- vybavena
 
 ## Poznamka k e-mailom
 
-Tento prototyp zatial neodosiela skutocny e-mail cez SMTP server. Pri vytvoreni objednavky zapise obsah e-mailu pre zakaznika aj administratora do `data/emails.log`. Na realne odosielanie bude potrebne doplnit SMTP udaje vasej e-mailovej schranky alebo firemneho mail servera.
+Aplikacia zatial iba zapisuje simulovany e-mail do `data/emails.log`. Na skutocne odosielanie treba doplnit SMTP alebo transakcnu e-mailovu sluzbu.

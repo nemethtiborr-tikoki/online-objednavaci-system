@@ -4,9 +4,16 @@
   "private": true,
   "description": "Jednoduchy online objednavaci system tovaru",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check server.js && node --check database.js && node --check auth.js && node --check scripts/migrate-sqlite-to-postgres.js",
+    "test": "node --test",
+    "migrate:neon": "node scripts/migrate-sqlite-to-postgres.js"
   },
+  "packageManager": "pnpm@11.0.7",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
   }
 }
