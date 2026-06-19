@@ -62,6 +62,6 @@ pnpm test
 
 ## Poznamka k e-mailom
 
-Administrator nastavi SMTP server priamo v sekcii `Nastavenia`. Konfiguracia obsahuje server, port, sifrovanie, prihlasovacie udaje, odosielatela a firemny e-mail pre prijem objednavok. Tlacidlo `Overit pripojenie` skontroluje ulozene nastavenie pred jeho pouzitim.
+Administrator nastavi e-mailovu sluzbu priamo v sekcii `Nastavenia`. Odporucane Brevo API komunikuje cez HTTPS a funguje aj na bezplatnom Renderi. Alternativne je mozne pouzit SMTP na hostingu, ktory neblokuje e-mailove porty. Tlacidlo `Overit sluzbu` skontroluje ulozene nastavenie pred jeho pouzitim.
 
-Po zapnuti SMTP sa nova objednavka odosle zakaznikovi aj na firemny e-mail. Heslo SMTP sa z API nikdy neposiela spat do prehliadaca; prazdne pole hesla pri neskorsej uprave ponecha povodne ulozene heslo.
+Po zapnuti odosielania sa nova objednavka odosle zakaznikovi aj na firemny e-mail. Brevo API kluc ani heslo SMTP sa z API nikdy neposielaju spat do prehliadaca; prazdne tajne pole pri neskorsej uprave ponecha povodnu ulozenu hodnotu.

@@ -39,6 +39,46 @@ async function verifySmtp(settings) {
   await transporter.verify();
 }
 
+function emailProvider(settings) {
+  return settings.emailProvider === "brevo" ? "brevo" : "smtp";
+}
+
+function validateBrevoSettings(settings) {
+  if (!settings.brevoApiKey) throw Object.assign(new Error("Zadajte Brevo API kluc."), { statusCode: 400 });
+  if (!settings.smtpFromEmail) throw Object.assign(new Error("Zadajte a overte e-mail odosielatela v Brevo."), { statusCode: 400 });
+  if (!settings.ownerEmail) throw Object.assign(new Error("Zadajte e-mail pre prijem objednavok."), { statusCode: 400 });
+}
+
+async function brevoRequest(path, settings, options = {}) {
+  validateBrevoSettings(settings);
+  const response = await fetch(`https://api.brevo.com/v3${path}`, {
+    ...options,
+    headers: {
+      accept: "application/json",
+      "api-key": settings.brevoApiKey,
+      "content-type": "application/json",
+      ...options.headers
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.message || `Brevo API vratilo chybu ${response.status}.`);
+    error.code = "EBREVO";
+    error.responseCode = response.status;
+    throw error;
+  }
+  return data;
+}
+
+async function verifyBrevo(settings) {
+  await brevoRequest("/account", settings, { method: "GET" });
+}
+
+async function verifyEmailSettings(settings) {
+  if (emailProvider(settings) === "brevo") return verifyBrevo(settings);
+  return verifySmtp(settings);
+}
+
 function smtpErrorMessage(error) {
   if (error?.statusCode === 400 && error?.message) return error.message;
   const code = String(error?.code || "").toUpperCase();
@@ -58,6 +98,17 @@ function smtpErrorMessage(error) {
     return "Nepodarilo sa vytvorit sifrovane spojenie. Pre Gmail nastavte port 587 a STARTTLS.";
   }
   return "Pripojenie k e-mailovemu serveru sa nepodarilo. Skontrolujte adresu, port, sifrovanie a prihlasovacie udaje.";
+}
+
+function emailErrorMessage(error, settings = {}) {
+  if (emailProvider(settings) !== "brevo") return smtpErrorMessage(error);
+  if (error?.statusCode === 400 && error?.message) return error.message;
+  const status = Number(error?.responseCode || 0);
+  if ([401, 403].includes(status)) return "Brevo odmietlo API kluc. Vytvorte novy kluc v Brevo a vlozte ho do nastaveni aplikacie.";
+  if (status === 429) return "Brevo docasne odmietlo odoslanie alebo bol dosiahnuty denny limit.";
+  if (status === 400) return "Brevo odmietlo spravu. Skontrolujte, ci je e-mail odosielatela v Brevo overeny.";
+  if (["ETIMEDOUT", "ENETUNREACH", "ECONNRESET"].includes(String(error?.code || "").toUpperCase())) return "K Brevo API sa nepodarilo pripojit. Skuste overenie zopakovat.";
+  return "Spojenie so sluzbou Brevo sa nepodarilo. Skontrolujte API kluc a overenie odosielatela.";
 }
 
 function money(value) {
@@ -111,6 +162,22 @@ function orderHtml(order) {
 
 async function sendOrderEmails(order, settings) {
   if (!booleanSetting(settings.smtpEnabled)) return { configured: false, sent: false };
+  if (emailProvider(settings) === "brevo") {
+    validateBrevoSettings(settings);
+    const recipients = [...new Set([order.customerEmail, settings.ownerEmail].filter(Boolean))];
+    await Promise.all(recipients.map(email => brevoRequest("/smtp/email", settings, {
+      method: "POST",
+      body: JSON.stringify({
+        sender: { name: String(settings.smtpFromName || "CORNiCO").trim(), email: settings.smtpFromEmail },
+        to: [{ email }],
+        replyTo: { email: email === order.customerEmail ? settings.ownerEmail : order.customerEmail },
+        subject: `Objednavka ${order.number}`,
+        textContent: orderText(order),
+        htmlContent: orderHtml(order)
+      })
+    })));
+    return { configured: true, sent: true };
+  }
   validateSmtpSettings(settings);
   const transporter = nodemailer.createTransport(smtpConfig(settings));
   const fromName = String(settings.smtpFromName || "CORNiCO").trim();
@@ -127,4 +194,4 @@ async function sendOrderEmails(order, settings) {
   return { configured: true, sent: true };
 }
 
-module.exports = { sendOrderEmails, verifySmtp, smtpErrorMessage };
+module.exports = { sendOrderEmails, verifySmtp, verifyBrevo, verifyEmailSettings, smtpErrorMessage, emailErrorMessage };

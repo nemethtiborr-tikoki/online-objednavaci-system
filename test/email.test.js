@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { sendOrderEmails, verifySmtp, smtpErrorMessage } = require("../email");
+const { sendOrderEmails, verifySmtp, verifyBrevo, smtpErrorMessage, emailErrorMessage } = require("../email");
 
 test("vypnute SMTP neodosiela objednavku", async () => {
   const result = await sendOrderEmails({ items: [] }, { smtpEnabled: "false" });
@@ -35,4 +35,59 @@ test("Gmail odmietne nespravnu kombinaciu TLS a portu", async () => {
     }),
     /STARTTLS/
   );
+});
+
+test("Brevo overenie pouzije HTTPS API a API kluc", async () => {
+  const originalFetch = global.fetch;
+  let request;
+  global.fetch = async (url, options) => {
+    request = { url, options };
+    return { ok: true, json: async () => ({ email: "sender@example.com" }) };
+  };
+  try {
+    await verifyBrevo({
+      emailProvider: "brevo",
+      brevoApiKey: "test-key",
+      smtpFromEmail: "sender@example.com",
+      ownerEmail: "orders@example.com"
+    });
+    assert.equal(request.url, "https://api.brevo.com/v3/account");
+    assert.equal(request.options.headers["api-key"], "test-key");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("Brevo chyba kluca ma zrozumitelnu spravu", () => {
+  const message = emailErrorMessage({ code: "EBREVO", responseCode: 401 }, { emailProvider: "brevo" });
+  assert.match(message, /API kluc/);
+});
+
+test("Brevo odosle zakaznicku a firemnu spravu oddelene", async () => {
+  const originalFetch = global.fetch;
+  const recipients = [];
+  global.fetch = async (_url, options) => {
+    recipients.push(JSON.parse(options.body).to[0].email);
+    return { ok: true, json: async () => ({ messageId: "test" }) };
+  };
+  try {
+    const result = await sendOrderEmails({
+      number: "2026-0001",
+      customerName: "Zakaznik",
+      customerEmail: "customer@example.com",
+      createdAt: new Date().toISOString(),
+      note: "",
+      items: []
+    }, {
+      emailProvider: "brevo",
+      smtpEnabled: true,
+      brevoApiKey: "test-key",
+      smtpFromEmail: "sender@example.com",
+      ownerEmail: "orders@example.com"
+    });
+    assert.deepEqual(recipients.sort(), ["customer@example.com", "orders@example.com"]);
+    assert.equal(result.sent, true);
+  } finally {
+    global.fetch = originalFetch;
+  }
 });

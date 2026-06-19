@@ -1040,22 +1040,31 @@ function renderEmailSettings() {
       <input name="smtpEnabled" type="checkbox" ${settings.smtpEnabled ? "checked" : ""}>
       Zapnut odosielanie objednavok e-mailom
     </label>
-    <label class="span-3">SMTP server
+    <label class="span-6">Sposob odosielania
+      <select name="emailProvider">
+        <option value="brevo" ${settings.emailProvider === "brevo" ? "selected" : ""}>Brevo API (odporucane)</option>
+        <option value="smtp" ${settings.emailProvider === "brevo" ? "" : "selected"}>SMTP server</option>
+      </select>
+    </label>
+    <label class="span-6" data-provider="brevo">Brevo API kluc
+      <input name="brevoApiKey" type="password" autocomplete="new-password" placeholder="${settings.hasBrevoApiKey ? "API kluc je ulozeny" : "xkeysib-..."}">
+    </label>
+    <label class="span-3" data-provider="smtp">SMTP server
       <input name="smtpHost" value="${escapeHtml(settings.smtpHost || "")}" placeholder="smtp.firma.sk">
     </label>
-    <label class="span-3">Port
+    <label class="span-3" data-provider="smtp">Port
       <input name="smtpPort" type="number" min="1" max="65535" value="${escapeHtml(settings.smtpPort || 587)}">
     </label>
-    <label class="span-3">Zabezpecenie
+    <label class="span-3" data-provider="smtp">Zabezpecenie
       <select name="smtpSecure">
         <option value="false" ${settings.smtpSecure ? "" : "selected"}>STARTTLS</option>
         <option value="true" ${settings.smtpSecure ? "selected" : ""}>TLS</option>
       </select>
     </label>
-    <label class="span-3">Prihlasovacie meno
+    <label class="span-3" data-provider="smtp">Prihlasovacie meno
       <input name="smtpUsername" autocomplete="off" value="${escapeHtml(settings.smtpUsername || "")}">
     </label>
-    <label class="span-3">Heslo
+    <label class="span-3" data-provider="smtp">Heslo
       <input name="smtpPassword" type="password" autocomplete="new-password" placeholder="${settings.hasPassword ? "Heslo je ulozene" : ""}">
     </label>
     <label class="span-3">Nazov odosielatela
@@ -1069,7 +1078,7 @@ function renderEmailSettings() {
     </label>
     <div class="span-6 actions">
       <button type="submit">Ulozit nastavenia</button>
-      <button class="secondary" type="button" data-test-smtp="true">Overit pripojenie</button>
+      <button class="secondary" type="button" data-test-smtp="true">Overit sluzbu</button>
     </div>
   `;
 
@@ -1108,6 +1117,15 @@ function renderEmailSettings() {
     if (form.elements.smtpHost.value.trim().toLowerCase() !== "smtp.gmail.com") return;
     form.elements.smtpPort.value = form.elements.smtpSecure.value === "true" ? "465" : "587";
   });
+
+  const updateProviderFields = () => {
+    const selected = form.elements.emailProvider.value;
+    for (const field of form.querySelectorAll("[data-provider]")) {
+      field.hidden = field.dataset.provider !== selected;
+    }
+  };
+  form.elements.emailProvider.addEventListener("change", updateProviderFields);
+  updateProviderFields();
 
   return el("section", { class: "grid" }, [
     pageTitle("Nastavenia", "E-mailovy server a dorucovanie objednavok."),

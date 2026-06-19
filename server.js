@@ -4,7 +4,7 @@ const path = require("path");
 const crypto = require("crypto");
 const db = require("./database");
 const { verifyPassword, hashSessionToken } = require("./auth");
-const { sendOrderEmails, verifySmtp, smtpErrorMessage } = require("./email");
+const { sendOrderEmails, verifyEmailSettings, emailErrorMessage } = require("./email");
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
@@ -100,6 +100,7 @@ function cleanBoolean(value) {
 
 function publicEmailSettings(settings) {
   return {
+    emailProvider: settings.emailProvider === "brevo" ? "brevo" : "smtp",
     smtpEnabled: cleanBoolean(settings.smtpEnabled),
     smtpHost: settings.smtpHost || "",
     smtpPort: Number(settings.smtpPort) || 587,
@@ -108,13 +109,15 @@ function publicEmailSettings(settings) {
     smtpFromName: settings.smtpFromName || "CORNiCO",
     smtpFromEmail: settings.smtpFromEmail || "",
     ownerEmail: settings.ownerEmail || "",
-    hasPassword: Boolean(settings.smtpPassword)
+    hasPassword: Boolean(settings.smtpPassword),
+    hasBrevoApiKey: Boolean(settings.brevoApiKey)
   };
 }
 
 function cleanEmailSettings(body, current) {
   const port = Number(body.smtpPort);
   const settings = {
+    emailProvider: body.emailProvider === "brevo" ? "brevo" : "smtp",
     smtpEnabled: cleanBoolean(body.smtpEnabled),
     smtpHost: cleanText(body.smtpHost),
     smtpPort: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 587,
@@ -123,7 +126,8 @@ function cleanEmailSettings(body, current) {
     smtpFromName: cleanText(body.smtpFromName) || "CORNiCO",
     smtpFromEmail: cleanText(body.smtpFromEmail),
     ownerEmail: cleanText(body.ownerEmail),
-    smtpPassword: cleanText(body.smtpPassword).replace(/\s/g, "") || current.smtpPassword || ""
+    smtpPassword: cleanText(body.smtpPassword).replace(/\s/g, "") || current.smtpPassword || "",
+    brevoApiKey: cleanText(body.brevoApiKey) || current.brevoApiKey || ""
   };
   return settings;
 }
@@ -324,8 +328,14 @@ async function handleApi(req, res) {
       if (!(await requireAdmin(req, res))) return;
       const current = await db.getSettings();
       const settings = cleanEmailSettings(await readBody(req), current);
-      if (settings.smtpEnabled && (!settings.smtpHost || !settings.smtpFromEmail || !settings.ownerEmail)) {
-        return sendJson(res, 400, { error: "Pri zapnutom odosielani vyplnte SMTP server, e-mail odosielatela a e-mail pre prijem objednavok." });
+      if (settings.smtpEnabled && (!settings.smtpFromEmail || !settings.ownerEmail)) {
+        return sendJson(res, 400, { error: "Pri zapnutom odosielani vyplnte e-mail odosielatela a e-mail pre prijem objednavok." });
+      }
+      if (settings.smtpEnabled && settings.emailProvider === "brevo" && !settings.brevoApiKey) {
+        return sendJson(res, 400, { error: "Pri odosielani cez Brevo zadajte API kluc." });
+      }
+      if (settings.smtpEnabled && settings.emailProvider === "smtp" && !settings.smtpHost) {
+        return sendJson(res, 400, { error: "Pri odosielani cez SMTP zadajte adresu servera." });
       }
       const updated = await db.updateSettings(settings);
       return sendJson(res, 200, { settings: publicEmailSettings(updated) });
@@ -333,12 +343,13 @@ async function handleApi(req, res) {
 
     if (method === "POST" && url.pathname === "/api/settings/email/test") {
       if (!(await requireAdmin(req, res))) return;
+      const settings = await db.getSettings();
       try {
-        await verifySmtp(await db.getSettings());
+        await verifyEmailSettings(settings);
         return sendJson(res, 200, { ok: true });
       } catch (error) {
-        console.error("SMTP overenie zlyhalo:", error.message);
-        return sendJson(res, 400, { error: smtpErrorMessage(error) });
+        console.error("Overenie e-mailovej sluzby zlyhalo:", error.message);
+        return sendJson(res, 400, { error: emailErrorMessage(error, settings) });
       }
     }
 
