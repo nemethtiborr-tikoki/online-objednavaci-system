@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const { generateOrderPdf, orderPdfFilename } = require("./order-pdf");
 
 function booleanSetting(value) {
   return value === true || String(value).toLowerCase() === "true";
@@ -162,6 +163,8 @@ function orderHtml(order) {
 
 async function sendOrderEmails(order, settings) {
   if (!booleanSetting(settings.smtpEnabled)) return { configured: false, sent: false };
+  const pdf = await generateOrderPdf(order);
+  const pdfFilename = orderPdfFilename(order);
   if (emailProvider(settings) === "brevo") {
     validateBrevoSettings(settings);
     const recipients = [...new Set([order.customerEmail, settings.ownerEmail].filter(Boolean))];
@@ -173,7 +176,8 @@ async function sendOrderEmails(order, settings) {
         replyTo: { email: email === order.customerEmail ? settings.ownerEmail : order.customerEmail },
         subject: `Objednavka ${order.number}`,
         textContent: orderText(order),
-        htmlContent: orderHtml(order)
+        htmlContent: orderHtml(order),
+        attachment: [{ name: pdfFilename, content: pdf.toString("base64") }]
       })
     })));
     return { configured: true, sent: true };
@@ -189,7 +193,8 @@ async function sendOrderEmails(order, settings) {
     replyTo: to === order.customerEmail ? settings.ownerEmail : order.customerEmail,
     subject: `Objednavka ${order.number}`,
     text: orderText(order),
-    html: orderHtml(order)
+    html: orderHtml(order),
+    attachments: [{ filename: pdfFilename, content: pdf, contentType: "application/pdf" }]
   })));
   return { configured: true, sent: true };
 }

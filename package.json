@@ -5,7 +5,7 @@
   "description": "Jednoduchy online objednavaci system tovaru",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check database.js && node --check auth.js && node --check scripts/migrate-sqlite-to-postgres.js",
+    "check": "node --check server.js && node --check database.js && node --check auth.js && node --check email.js && node --check order-pdf.js && node --check public/app.js && node --check scripts/migrate-sqlite-to-postgres.js",
     "test": "node --test",
     "migrate:neon": "node scripts/migrate-sqlite-to-postgres.js"
   },
@@ -14,7 +14,9 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@fontsource/noto-sans": "^5.2.10",
     "nodemailer": "^9.0.1",
+    "pdfkit": "^0.19.1",
     "pg": "^8.16.3"
   }
 }

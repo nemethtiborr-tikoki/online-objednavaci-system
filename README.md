@@ -64,4 +64,4 @@ pnpm test
 
 Administrator nastavi e-mailovu sluzbu priamo v sekcii `Nastavenia`. Odporucane Brevo API komunikuje cez HTTPS a funguje aj na bezplatnom Renderi. Alternativne je mozne pouzit SMTP na hostingu, ktory neblokuje e-mailove porty. Tlacidlo `Overit sluzbu` skontroluje ulozene nastavenie pred jeho pouzitim.
 
-Po zapnuti odosielania sa nova objednavka odosle zakaznikovi aj na firemny e-mail. Brevo API kluc ani heslo SMTP sa z API nikdy neposielaju spat do prehliadaca; prazdne tajne pole pri neskorsej uprave ponecha povodnu ulozenu hodnotu.
+Po zapnuti odosielania sa nova objednavka odosle zakaznikovi aj na firemny e-mail. Ku kazdej sprave sa automaticky prilozi PDF objednavky s udajmi zakaznika, polozkami, hmotnostou a cenou. Brevo API kluc ani heslo SMTP sa z API nikdy neposielaju spat do prehliadaca; prazdne tajne pole pri neskorsej uprave ponecha povodnu ulozenu hodnotu.

@@ -65,9 +65,9 @@ test("Brevo chyba kluca ma zrozumitelnu spravu", () => {
 
 test("Brevo odosle zakaznicku a firemnu spravu oddelene", async () => {
   const originalFetch = global.fetch;
-  const recipients = [];
+  const messages = [];
   global.fetch = async (_url, options) => {
-    recipients.push(JSON.parse(options.body).to[0].email);
+    messages.push(JSON.parse(options.body));
     return { ok: true, json: async () => ({ messageId: "test" }) };
   };
   try {
@@ -85,7 +85,9 @@ test("Brevo odosle zakaznicku a firemnu spravu oddelene", async () => {
       smtpFromEmail: "sender@example.com",
       ownerEmail: "orders@example.com"
     });
-    assert.deepEqual(recipients.sort(), ["customer@example.com", "orders@example.com"]);
+    assert.deepEqual(messages.map(message => message.to[0].email).sort(), ["customer@example.com", "orders@example.com"]);
+    assert.equal(messages[0].attachment[0].name, "objednavka-2026-0001.pdf");
+    assert.match(messages[0].attachment[0].content, /^JVBERi0/);
     assert.equal(result.sent, true);
   } finally {
     global.fetch = originalFetch;
