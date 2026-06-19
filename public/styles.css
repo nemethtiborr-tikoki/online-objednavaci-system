@@ -320,6 +320,29 @@ td {
   vertical-align: middle;
 }
 
+.line-total {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.selected-order-row .line-total {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.order-total-row td {
+  border-top: 2px solid var(--accent);
+  border-bottom: 0;
+  background: #f4f4fa;
+  white-space: nowrap;
+}
+
+.order-total-row td:first-child {
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-align: right;
+}
+
 th {
   color: var(--muted);
   background: #f8faf8;

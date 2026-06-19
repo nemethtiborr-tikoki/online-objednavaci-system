@@ -259,25 +259,69 @@ function renderCustomerOrder() {
   const quantities = new Map();
   const note = el("textarea", { placeholder: "Volitelna poznamka k objednavke" });
   const tbody = el("tbody");
+  const totalQuantity = el("strong", { text: "0" });
+  const totalWeight = el("strong", { text: weightText(0) });
+  const totalPrice = el("strong", { text: money(0) });
 
   for (const product of state.products) {
     const quantity = el("input", { class: "number-input", type: "number", min: "0", step: "1", value: "0" });
-    quantities.set(product.id, quantity);
-    tbody.append(el("tr", {}, [
+    const lineWeight = el("td", { class: "line-total", text: weightText(0) });
+    const linePrice = el("td", { class: "line-total", text: money(0) });
+    const row = el("tr", {}, [
       el("td", { text: product.cardNumber }),
       el("td", { text: product.name }),
       el("td", { text: product.unit }),
       el("td", { text: weightText(product.weight) }),
       el("td", { text: money(product.price) }),
-      el("td", {}, quantity)
-    ]));
+      el("td", {}, quantity),
+      lineWeight,
+      linePrice
+    ]);
+    quantities.set(product.id, { input: quantity, product, lineWeight, linePrice, row });
+    tbody.append(row);
   }
+
+  const updateTotals = () => {
+    let quantitySum = 0;
+    let weightSum = 0;
+    let priceSum = 0;
+    for (const { input, product, lineWeight, linePrice, row } of quantities.values()) {
+      const quantity = Math.max(0, Math.trunc(Number(input.value || 0)));
+      const weight = quantity * Number(product.weight || 0);
+      const price = quantity * Number(product.price || 0);
+      quantitySum += quantity;
+      weightSum += weight;
+      priceSum += price;
+      lineWeight.textContent = weightText(weight);
+      linePrice.textContent = money(price);
+      row.classList.toggle("selected-order-row", quantity > 0);
+    }
+    totalQuantity.textContent = String(quantitySum);
+    totalWeight.textContent = weightText(weightSum);
+    totalPrice.textContent = money(priceSum);
+  };
+
+  for (const { input } of quantities.values()) {
+    input.addEventListener("input", updateTotals);
+    input.addEventListener("blur", () => {
+      input.value = String(Math.max(0, Math.trunc(Number(input.value || 0))));
+      updateTotals();
+    });
+  }
+
+  const tfoot = el("tfoot", {}, el("tr", { class: "order-total-row" }, [
+    el("td", { colspan: "5", text: "Spolu" }),
+    el("td", {}, totalQuantity),
+    el("td", {}, totalWeight),
+    el("td", {}, totalPrice)
+  ]));
 
   const form = el("form", { class: "grid" }, [
     pageTitle("Nova objednavka", "Vyplnte mnozstva pri tovare, ktory chcete objednat."),
     el("div", { class: "table-wrap" }, el("table", {}, [
-      tableHead(["Cislo karty", "Nazov", "MJ", "Hmotnost", "Cena", "Mnozstvo"]),
-      tbody
+      tableHead(["Cislo karty", "Nazov", "MJ", "Hmotnost/ks", "Cena/ks", "Mnozstvo", "Hmotnost spolu", "Cena spolu"]),
+      tbody,
+      tfoot
     ])),
     el("label", {}, ["Poznamka", note]),
     el("div", { class: "summary" }, [
@@ -289,7 +333,7 @@ function renderCustomerOrder() {
 
   form.addEventListener("submit", async event => {
     event.preventDefault();
-    const items = [...quantities.entries()].map(([productId, input]) => ({
+    const items = [...quantities.entries()].map(([productId, { input }]) => ({
       productId,
       quantity: Math.trunc(Number(input.value || 0))
     }));
