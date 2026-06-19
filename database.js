@@ -87,6 +87,19 @@ function mapOrderItem(row) {
   };
 }
 
+function mapAnnouncement(row) {
+  return {
+    id: row.id,
+    category: row.category,
+    title: row.title,
+    content: row.content,
+    authorName: row.author_name || "Administrator",
+    published: Boolean(row.published),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString()
+  };
+}
+
 async function createSchema(client = pool) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -151,9 +164,21 @@ async function createSchema(client = pool) {
       year INTEGER PRIMARY KEY,
       last_number INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS announcements (
+      id TEXT PRIMARY KEY,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      author_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      author_name TEXT NOT NULL,
+      published BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
     CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
     CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders(customer_id);
     CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON order_items(order_id);
+    CREATE INDEX IF NOT EXISTS announcements_created_at_idx ON announcements(created_at DESC);
   `);
 }
 
@@ -368,6 +393,29 @@ async function updateSettings(settings) {
   return getSettings();
 }
 
+async function listAnnouncements(includeHidden = false) {
+  const where = includeHidden ? "" : "WHERE published=TRUE";
+  const { rows } = await pool.query(`SELECT * FROM announcements ${where} ORDER BY created_at DESC, id DESC`);
+  return rows.map(mapAnnouncement);
+}
+
+async function createAnnouncement(data, author) {
+  const now = new Date();
+  const { rows } = await pool.query(`
+    INSERT INTO announcements (id,category,title,content,author_id,author_name,published,created_at,updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,TRUE,$7,$7) RETURNING *
+  `, [crypto.randomUUID(), data.category, data.title, data.content, author.id, author.name, now]);
+  return mapAnnouncement(rows[0]);
+}
+
+async function setAnnouncementPublished(id, published) {
+  const { rows } = await pool.query(
+    "UPDATE announcements SET published=$2,updated_at=NOW() WHERE id=$1 RETURNING *",
+    [id, published]
+  );
+  return rows[0] ? mapAnnouncement(rows[0]) : null;
+}
+
 async function createOrder(user, lines, note) {
   const client = await pool.connect();
   try {
@@ -479,7 +527,7 @@ async function replaceAllData(data) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("TRUNCATE sessions,order_items,orders,products,users,settings,order_counters RESTART IDENTITY CASCADE");
+    await client.query("TRUNCATE sessions,announcements,order_items,orders,products,users,settings,order_counters RESTART IDENTITY CASCADE");
     for (const [key, value] of Object.entries(data.settings || {})) await client.query("INSERT INTO settings (key,value) VALUES ($1,$2)", [key, String(value)]);
     for (const user of data.users || []) {
       const p = user.profile || emptyProfile();
@@ -510,5 +558,6 @@ module.exports = {
   initializeDatabase, createSchema, getUserByUsername, getUserById, getUserBySession,
   createSession, deleteSession, updateProfile, listCustomers, createCustomer, updateCustomer,
   deleteCustomer, listProducts, createProduct, updateProduct, deleteProduct, importProducts,
-  getSettings, updateSettings, createOrder, listOrders, getOrderById, updateOrder, replaceAllData, close
+  getSettings, updateSettings, listAnnouncements, createAnnouncement, setAnnouncementPublished,
+  createOrder, listOrders, getOrderById, updateOrder, replaceAllData, close
 };

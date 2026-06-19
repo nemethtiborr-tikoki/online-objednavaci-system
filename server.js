@@ -163,6 +163,15 @@ function cleanOrderStatus(value, fallback = "nova") {
   return ["nova", "spracovava_sa", "vybavena"].includes(status) ? status : fallback;
 }
 
+function cleanAnnouncementPayload(body) {
+  const category = cleanText(body.category);
+  return {
+    category: ["upozornenie", "novinka", "ponuka", "ine"].includes(category) ? category : "ine",
+    title: cleanText(body.title),
+    content: cleanText(body.content)
+  };
+}
+
 function cleanProductPayload(body) {
   return {
     cardNumber: cleanText(body.cardNumber), name: cleanText(body.name), unit: cleanText(body.unit),
@@ -351,6 +360,29 @@ async function handleApi(req, res) {
         console.error("Overenie e-mailovej sluzby zlyhalo:", error.message);
         return sendJson(res, 400, { error: emailErrorMessage(error, settings) });
       }
+    }
+
+    if (method === "GET" && url.pathname === "/api/announcements") {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      return sendJson(res, 200, { announcements: await db.listAnnouncements(user.role === "admin") });
+    }
+
+    if (method === "POST" && url.pathname === "/api/announcements") {
+      const admin = await requireAdmin(req, res);
+      if (!admin) return;
+      const announcement = cleanAnnouncementPayload(await readBody(req));
+      if (!announcement.title || !announcement.content) return sendJson(res, 400, { error: "Nadpis a text informacie su povinne." });
+      if (announcement.title.length > 160 || announcement.content.length > 10_000) return sendJson(res, 400, { error: "Nadpis alebo text informacie je prilis dlhy." });
+      return sendJson(res, 201, { announcement: await db.createAnnouncement(announcement, admin) });
+    }
+
+    if (method === "PUT" && url.pathname.startsWith("/api/announcements/")) {
+      if (!(await requireAdmin(req, res))) return;
+      const body = await readBody(req);
+      const announcement = await db.setAnnouncementPublished(url.pathname.split("/").pop(), cleanBoolean(body.published));
+      if (!announcement) return sendJson(res, 404, { error: "Informacia neexistuje." });
+      return sendJson(res, 200, { announcement });
     }
 
     if (method === "GET" && url.pathname === "/api/products") {

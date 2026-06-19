@@ -5,8 +5,9 @@ let state = {
   products: [],
   orders: [],
   customers: [],
+  announcements: [],
   emailSettings: null,
-  view: "order",
+  view: "home",
   selectedOrderId: null,
   orderFilterOpen: false,
   orderFilters: {
@@ -42,6 +43,13 @@ const ORDER_STATUSES = [
   ["spracovava_sa", "spracovava sa"],
   ["vybavena", "vybavena"]
 ];
+const ANNOUNCEMENT_CATEGORIES = [
+  ["upozornenie", "Upozornenie"],
+  ["novinka", "Novinka"],
+  ["ponuka", "Ponuka"],
+  ["ine", "Informacia"]
+];
+const announcementCategoryLabel = category => ANNOUNCEMENT_CATEGORIES.find(([value]) => value === category)?.[1] || "Informacia";
 const orderStatusLabel = status => {
   if (status === "spracovana") return "spracovava sa";
   return ORDER_STATUSES.find(([value]) => value === status)?.[1] || status || "nova objednavka";
@@ -98,7 +106,7 @@ async function loadSession() {
   const { user } = await api("/api/me");
   state.user = user;
   if (user) {
-    if (user.role === "admin" && state.view === "order") state.view = "dashboard";
+    if (user.role === "admin" && state.view === "home") state.view = "dashboard";
     await refreshData();
   }
   render();
@@ -107,15 +115,17 @@ async function loadSession() {
 async function refreshData() {
   const requests = [
     api("/api/products"),
-    api("/api/orders")
+    api("/api/orders"),
+    api("/api/announcements")
   ];
   if (state.user?.role === "admin") {
     requests.push(api("/api/customers"));
     requests.push(api("/api/settings/email"));
   }
-  const [productsData, ordersData, customersData, settingsData] = await Promise.all(requests);
+  const [productsData, ordersData, announcementsData, customersData, settingsData] = await Promise.all(requests);
   state.products = productsData.products;
   state.orders = ordersData.orders;
+  state.announcements = announcementsData.announcements;
   state.customers = customersData?.customers || [];
   state.emailSettings = settingsData?.settings || null;
 }
@@ -165,7 +175,7 @@ function renderLogin() {
         body: JSON.stringify(Object.fromEntries(formData))
       });
       state.user = user;
-      state.view = user.role === "admin" ? "dashboard" : "order";
+      state.view = user.role === "admin" ? "dashboard" : "home";
       await refreshData();
       setMessage("");
     } catch (error) {
@@ -178,8 +188,8 @@ function renderLogin() {
 function renderShell() {
   const shell = el("div", { class: "app-shell" });
   const navItems = state.user.role === "admin"
-    ? [["dashboard", "Prehlad"], ["orders", "Historia objednavok"], ["products", "Tovarove polozky"], ["customers", "Zakaznici"], ["settings", "Nastavenia"]]
-    : [["order", "Nova objednavka"], ["my-orders", "Moje objednavky"], ["profile", "Moj profil"]];
+    ? [["dashboard", "Prehlad"], ["announcements", "Obsah pre zakaznikov"], ["orders", "Historia objednavok"], ["products", "Tovarove polozky"], ["customers", "Zakaznici"], ["settings", "Nastavenia"]]
+    : [["home", "Informacie"], ["order", "Nova objednavka"], ["my-orders", "Moje objednavky"], ["profile", "Moj profil"]];
 
   shell.append(
     el("header", { class: "topbar" }, [
@@ -212,6 +222,14 @@ function renderShell() {
             state.error = error.message;
           }
         }
+        if (view === "home" || view === "announcements") {
+          try {
+            const { announcements } = await api("/api/announcements");
+            state.announcements = announcements;
+          } catch (error) {
+            state.error = error.message;
+          }
+        }
         render();
       }
     }));
@@ -219,6 +237,8 @@ function renderShell() {
 
   const main = el("main", { class: "main" });
   if (state.view === "dashboard") main.append(renderAdminDashboard());
+  if (state.view === "home") main.append(renderCustomerHome());
+  if (state.view === "announcements") main.append(renderAnnouncementsAdmin());
   if (state.view === "order") main.append(renderCustomerOrder());
   if (state.view === "my-orders") main.append(renderOrders(false));
   if (state.view === "orders") main.append(renderOrders(true));
@@ -239,8 +259,9 @@ async function logout() {
     products: [],
     orders: [],
     customers: [],
+    announcements: [],
     emailSettings: null,
-    view: "order",
+    view: "home",
     selectedOrderId: null,
     orderFilterOpen: false,
     orderFilters: defaultOrderFilters(),
@@ -253,6 +274,111 @@ async function logout() {
     printOrder: null
   };
   render();
+}
+
+function renderAnnouncementItem(announcement, isAdmin = false) {
+  const actions = [];
+  if (isAdmin) {
+    actions.push(el("button", {
+      class: "secondary",
+      text: announcement.published ? "Skryt" : "Zverejnit",
+      onclick: async () => {
+        try {
+          await api(`/api/announcements/${announcement.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ published: !announcement.published })
+          });
+          const { announcements } = await api("/api/announcements");
+          state.announcements = announcements;
+          setMessage(announcement.published ? "Informacia bola skryta, v historii zostava zachovana." : "Informacia bola znovu zverejnena.");
+        } catch (error) {
+          setMessage("", error.message);
+        }
+      }
+    }));
+  }
+
+  return el("article", { class: `announcement-item announcement-${announcement.category} ${announcement.published ? "" : "announcement-hidden"}` }, [
+    el("div", { class: "announcement-meta" }, [
+      el("span", { class: `announcement-category category-${announcement.category}`, text: announcementCategoryLabel(announcement.category) }),
+      el("time", { datetime: announcement.createdAt, text: dateTime(announcement.createdAt) }),
+      isAdmin && !announcement.published ? el("span", { class: "status zrusena", text: "skryta" }) : ""
+    ]),
+    el("div", { class: "announcement-heading" }, [
+      el("h2", { text: announcement.title }),
+      actions.length ? el("div", { class: "actions" }, actions) : ""
+    ]),
+    el("p", { class: "announcement-content", text: announcement.content }),
+    isAdmin ? el("div", { class: "announcement-author muted", text: `Zverejnil: ${announcement.authorName}` }) : ""
+  ]);
+}
+
+function renderCustomerHome() {
+  const container = el("section", { class: "grid" }, [
+    pageTitle("Informacie", "Upozornenia, novinky a aktualne ponuky."),
+    renderNotice()
+  ]);
+  if (!state.announcements.length) {
+    container.append(el("div", { class: "panel muted", text: "Aktualne nie su zverejnene ziadne informacie." }));
+    return container;
+  }
+  const feed = el("div", { class: "announcement-feed" });
+  for (const announcement of state.announcements) feed.append(renderAnnouncementItem(announcement));
+  container.append(feed);
+  return container;
+}
+
+function renderAnnouncementsAdmin() {
+  const form = el("form", { class: "panel form-grid" });
+  form.innerHTML = `
+    <label class="span-2">Typ informacie
+      <select name="category">
+        ${ANNOUNCEMENT_CATEGORIES.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}
+      </select>
+    </label>
+    <label class="span-6">Nadpis
+      <input name="title" required maxlength="160">
+    </label>
+    <label class="span-6">Text
+      <textarea name="content" required maxlength="10000"></textarea>
+    </label>
+    <div class="span-6 actions">
+      <button type="submit">Zverejnit informaciu</button>
+    </div>
+  `;
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    try {
+      await api("/api/announcements", {
+        method: "POST",
+        body: JSON.stringify(Object.fromEntries(new FormData(form)))
+      });
+      const { announcements } = await api("/api/announcements");
+      state.announcements = announcements;
+      form.reset();
+      setMessage("Informacia bola zverejnena.");
+    } catch (error) {
+      setMessage("", error.message);
+    }
+  });
+
+  const container = el("section", { class: "grid" }, [
+    pageTitle("Obsah pre zakaznikov", "Publikovanie a historia informacii."),
+    renderNotice(),
+    form,
+    el("div", { class: "section-heading" }, [
+      el("h2", { text: "Historia" }),
+      el("span", { class: "muted", text: `${state.announcements.length} zaznamov` })
+    ])
+  ]);
+  if (!state.announcements.length) {
+    container.append(el("div", { class: "panel muted", text: "Historia je zatial prazdna." }));
+    return container;
+  }
+  const history = el("div", { class: "announcement-feed" });
+  for (const announcement of state.announcements) history.append(renderAnnouncementItem(announcement, true));
+  container.append(history);
+  return container;
 }
 
 function renderCustomerOrder() {
