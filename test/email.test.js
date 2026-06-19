@@ -23,3 +23,16 @@ test("timeout SMTP upozorni na spojenie alebo hosting", () => {
   const message = smtpErrorMessage({ code: "ETIMEDOUT" });
   assert.match(message, /hosting/);
 });
+
+test("Gmail odmietne nespravnu kombinaciu TLS a portu", async () => {
+  await assert.rejects(
+    verifySmtp({
+      smtpHost: "smtp.gmail.com",
+      smtpPort: 587,
+      smtpSecure: true,
+      smtpFromEmail: "sender@example.com",
+      ownerEmail: "orders@example.com"
+    }),
+    /STARTTLS/
+  );
+});

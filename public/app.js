@@ -1104,6 +1104,11 @@ function renderEmailSettings() {
     }
   });
 
+  form.elements.smtpSecure.addEventListener("change", () => {
+    if (form.elements.smtpHost.value.trim().toLowerCase() !== "smtp.gmail.com") return;
+    form.elements.smtpPort.value = form.elements.smtpSecure.value === "true" ? "465" : "587";
+  });
+
   return el("section", { class: "grid" }, [
     pageTitle("Nastavenia", "E-mailovy server a dorucovanie objednavok."),
     renderNotice(),

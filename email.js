@@ -23,6 +23,12 @@ function validateSmtpSettings(settings) {
   if (!settings.smtpHost) throw Object.assign(new Error("Zadajte adresu SMTP servera."), { statusCode: 400 });
   const port = Number(settings.smtpPort);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw Object.assign(new Error("SMTP port nie je platny."), { statusCode: 400 });
+  if (String(settings.smtpHost).toLowerCase() === "smtp.gmail.com") {
+    const secure = booleanSetting(settings.smtpSecure);
+    if ((port === 587 && secure) || (port === 465 && !secure)) {
+      throw Object.assign(new Error("Pre Gmail pouzite port 587 so STARTTLS alebo port 465 s TLS."), { statusCode: 400 });
+    }
+  }
   if (!settings.smtpFromEmail) throw Object.assign(new Error("Zadajte e-mail odosielatela."), { statusCode: 400 });
   if (!settings.ownerEmail) throw Object.assign(new Error("Zadajte e-mail pre prijem objednavok."), { statusCode: 400 });
 }
@@ -34,6 +40,7 @@ async function verifySmtp(settings) {
 }
 
 function smtpErrorMessage(error) {
+  if (error?.statusCode === 400 && error?.message) return error.message;
   const code = String(error?.code || "").toUpperCase();
   const responseCode = Number(error?.responseCode || 0);
   const command = String(error?.command || "").toUpperCase();
