@@ -14,7 +14,6 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@fontsource/noto-sans": "^5.2.10",
     "nodemailer": "^9.0.1",
     "pdfkit": "^0.19.1",
     "pg": "^8.16.3"
