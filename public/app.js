@@ -198,6 +198,7 @@ function renderLogin() {
 
 function renderShell() {
   const shell = el("div", { class: "app-shell" });
+  const homeView = state.user.role === "admin" ? "dashboard" : "home";
   const navItems = state.user.role === "admin"
     ? [["dashboard", "Prehlad"], ["announcements", "Obsah pre zakaznikov"], ["orders", "Historia objednavok"], ["products", "Tovarove polozky"], ["customers", "Zakaznici"], ["settings", "Nastavenia"]]
     : [["home", "Informacie"], ["order", "Nova objednavka"], ["my-orders", "Moje objednavky"], ["profile", "Moj profil"]];
@@ -205,7 +206,27 @@ function renderShell() {
   shell.append(
     el("header", { class: "topbar" }, [
       el("div", { class: "brand" }, [
-        el("img", { class: "brand-logo", src: "/assets/cornico-logo.png", alt: "CORNiCO", onerror: event => event.currentTarget.hidden = true }),
+        el("a", {
+          class: "brand-home",
+          href: "/",
+          title: "Prejst na uvodnu obrazovku",
+          "aria-label": "Prejst na uvodnu obrazovku",
+          onclick: async event => {
+            event.preventDefault();
+            state.view = homeView;
+            state.selectedOrderId = null;
+            state.message = "";
+            state.error = "";
+            try {
+              await refreshData();
+            } catch (error) {
+              state.error = error.message;
+            }
+            render();
+          }
+        }, [
+          el("img", { class: "brand-logo", src: "/assets/cornico-logo.png", alt: "CORNiCO", onerror: event => event.currentTarget.hidden = true })
+        ]),
         el("span", { class: "brand-title", text: "Objednávkový systém CORNiCO" })
       ]),
       el("div", { class: "userbar" }, [

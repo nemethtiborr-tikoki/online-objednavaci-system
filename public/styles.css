@@ -123,10 +123,21 @@ label {
 }
 
 .brand-logo {
+  display: block;
   width: 112px;
   height: 38px;
   object-fit: contain;
   object-position: left center;
+}
+
+.brand-home {
+  display: block;
+  border-radius: 4px;
+}
+
+.brand-home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .brand-title {
